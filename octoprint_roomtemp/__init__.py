@@ -12,6 +12,7 @@ import sys
 import re
 import glob
 import os
+import subprocess
 
 class RoomTempPlugin(octoprint.plugin.StartupPlugin,
 					 octoprint.plugin.TemplatePlugin,
@@ -49,25 +50,29 @@ class RoomTempPlugin(octoprint.plugin.StartupPlugin,
 		self._checkTempTimer.start()
 
 	def checkRoomTemp(self):
-		os.system('modprobe w1-gpio')
-		os.system('modprobe w1-therm')
-		base_dir = '/sys/bus/w1/devices/'
-		device_folder = glob.glob(base_dir + '28*')[0]
-		device_file = device_folder + '/w1_slave'
-		if os.path.isfile(device_file):
-			lines = read_temp_raw(device_file)
-			while lines[0].strip()[-3:] != 'YES':
-				time.sleep(0.2)
-				lines = read_temp_raw(device_file)
-			equals_pos = lines[1].find('t=')
-			if equals_pos != -1:
-				temp_string = lines[1][equals_pos+2:]
-				temp_c = float(temp_string) / 1000.0
-				p = '{0:0.1f}'.format(temp_c)
-
-			self._plugin_manager.send_plugin_message(self._identifier, dict(israspi=self.isRaspi, roomtemp=p))
+		#os.system('modprobe w1-gpio')
+		#os.system('modprobe w1-therm')
+		#base_dir = '/sys/bus/w1/devices/'
+		#device_folder = glob.glob(base_dir + '28*')[0]
+		#device_file = device_folder + '/w1_slave'
+		#if os.path.isfile(device_file):
+		#	lines = read_temp_raw(device_file)
+		#	while lines[0].strip()[-3:] != 'YES':
+		#		time.sleep(0.2)
+		#		lines = read_temp_raw(device_file)
+		#	equals_pos = lines[1].find('t=')
+		#	if equals_pos != -1:
+		#		temp_string = lines[1][equals_pos+2:]
+		#		temp_c = float(temp_string) / 1000.0
+		#		p = '{0:0.1f}'.format(temp_c)
+		
+		temperature_string =  subprocess.check_output(['/opt/vc/bin/vcgencmd','measure_temp'])
+		# should look like: "temp=40.1'C\n"
+		short_temp = temperature_string.partition('=')[2].strip() 
+		if 'C' in short_temp:
+			self._plugin_manager.send_plugin_message(self._identifier, dict(israspi=self.isRaspi, roomtemp=short_temp))
 		else:
-			self._logger.info("No file temperature found !!")
+			self._logger.info("No file temperature found !!, found %s instead"%(temperature_string))
 
 	##~~ SettingsPlugin
 	def get_settings_defaults(self):
